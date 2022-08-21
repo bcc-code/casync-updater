@@ -1,0 +1,18 @@
+[
+    {
+        "interval": 1800000,
+        "srcIndex": "https://bcc-code.github.io/casync-updater/index.caidx",
+        "srcStore": "https://bcc-code.github.io/casync-updater/store.castr",
+        "dstPath": "/opt/casync-updater",
+        "triggers": [
+            {
+                "paths": [
+                    "."
+                ],
+                "actions": [
+                    "systemctl restart casync-updater.service"
+                ]
+            }
+        ]
+    }
+]
