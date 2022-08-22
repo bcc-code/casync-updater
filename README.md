@@ -17,8 +17,11 @@ wget -q https://github.com/bcc-code/casync-updater/raw/master/deploy/install.sh 
 
 The casync-updater client is installed as a systemd service.
 Please run ```systemctl status casync-updater.service``` to ensure the service is running correctly.
+
 Client configuration files directory: /etc/casync-updater
+
 Node JS scripts directory: /opt/casync-updater
+
 Restart the casync-updater service after modifying configuration files for the changes to take effect.
 
 ## Server
