@@ -36,7 +36,7 @@ mkdir -p /etc/casync-updater
 echo -e "${BLUE}"
 echo 'Downloading default configuration file: /etc/casync-updater/default.json'
 echo -e "${NC}"
-wget -O /etc/casync-updater/default.json https://github.com/bcc-code/casync-updater/raw/main/deploy/default.json
+wget -O /etc/casync-updater/default.json https://github.com/bcc-code/casync-updater/raw/master/deploy/default.json
 
 # Download casync-updater files using casync
 echo -e "${BLUE}"
