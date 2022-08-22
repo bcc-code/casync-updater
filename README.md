@@ -12,7 +12,7 @@ A simple self updating software update system with offline updating capabilities
 
 ## Installation
 ```shell
-wget -q https://github.com/bcc-code/casync-updater/raw/main/deploy/install.sh -O - | sudo bash
+wget -q https://github.com/bcc-code/casync-updater/raw/master/deploy/install.sh -O - | sudo bash
 ```
 
 The casync-updater client is installed as a systemd service.
