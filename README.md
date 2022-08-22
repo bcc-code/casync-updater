@@ -17,9 +17,9 @@ wget -q https://github.com/bcc-code/casync-updater/raw/main/deploy/install.sh -O
 
 The casync-updater client is installed as a systemd service.
 Please run ```systemctl status casync-updater.service``` to ensure the service is running correctly.
-Client configuration file location: /etc/casync-updater/client.json
-Node JS scripts location: /opt/casync-updater
-Restart the casync-updater service after modifying the client.json configuration file for the changes to take effect.
+Client configuration files directory: /etc/casync-updater
+Node JS scripts directory: /opt/casync-updater
+Restart the casync-updater service after modifying configuration files for the changes to take effect.
 
 ## Server
 The server.js Node.js script should executed passing the configuration file as an argument:
@@ -42,6 +42,11 @@ where:
 * "source" is the path to the directory or device where the repository to be distributed is stored.
 
 ## Client
+The casync-updater client reads a configuration file / directory with configuration files on startup. When installed using the installation script as described above, it will read all JSON formatted text configuration files in the /etc/casync-updater directory.
+A configuration file may contain one or several configuration entries.
+
+The installation script includes a default configuration script used to automatically update the casync-updater installation. This default configuration file may be modified to suit your needs (e.g. to point the updater to your own source location etc.)
+
 Configuration file example:
 ```json
 [
@@ -90,3 +95,8 @@ where:
 * "backupStore" (required only when backupIndex is set) is the path to the local backup casync store directory.
 * "dstPath" is the local directory path to be updated
 * "triggers" a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
+
+## To do
+- [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
+- [ ] Secure backup store - prevent unintentional / malicious tampering with offline updates. (Ideas welcome)
+- [ ] Distribute casync-updater updates via CDN (and not directly from GitHub pages due to usage limits).

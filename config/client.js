@@ -15,11 +15,33 @@ var checksum = {};
 
 // Load config and make casync archive
 if (process.argv.length > 2) {
-    // Load the configuration file passed as an argument
-    loadJSON(process.argv[2]).then(config => {
+    let path = process.argv[2];
+    // Check if the passed path is a directory or file
+    try {
+        if (fs.lstatSync(path).isDirectory()) {
+            let files = fs.readdirSync(path);
+            files.forEach(file => {
+                loadFile(path + '/' + file);
+            });
+        }
+        else if (fs.lstatSync(path).isFile()) {
+            loadFile(path);
+        }
+    }
+    catch (err) {
+        console.error(`Error reading configuration file or directory ${path}}: ${err}`);
+    }
+}
+
+/**
+ * Load a configuration file and parse the config
+ * @param {String} path 
+ */
+function loadFile(path) {
+    loadJSON(path).then(config => {
         parseConfig(config);
     }).catch(err => {
-        console.error(`Error in ${process.argv[2]}: ${err}`);
+        console.error(`Error in ${path}: ${err}`);
     });
 }
 

@@ -34,9 +34,9 @@ mkdir -p /etc/casync-updater
 
 # Download default configuration file
 echo -e "${BLUE}"
-echo 'Downloading default configuration file: /etc/casync-updater/client.json'
+echo 'Downloading default configuration file: /etc/casync-updater/default.json'
 echo -e "${NC}"
-wget -O /etc/casync-updater/client.json https://github.com/bcc-code/casync-updater/raw/main/deploy/client.json
+wget -O /etc/casync-updater/default.json https://github.com/bcc-code/casync-updater/raw/main/deploy/default.json
 
 # Download casync-updater files using casync
 echo -e "${BLUE}"
@@ -56,7 +56,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/casync-updater/
-ExecStart=nodejs /opt/casync-updater/client.js /etc/casync-updater/client.json
+ExecStart=nodejs /opt/casync-updater/client.js /etc/casync-updater
 Restart=always
 
 [Install]
@@ -72,7 +72,7 @@ echo 'Installation complete!'
 echo '######################'
 echo ''
 echo 'Please run "systemctl status casync-updater.service" to ensure the service is running correctly.'
-echo 'Configuration file location: /etc/casync-updater/client.json'
-echo 'Add your own casync sources and destinations to the config.json file (see https://github.com/bccsa/casync-updater for detailed instructions).'
-echo 'Restart the casync-updater service after modifying the client.json configuration file for the changes to take effect.'
+echo 'Configuration files directory: /etc/casync-updater'
+echo 'Add your own casync configuration files to /etc/casync-updater (see https://github.com/bcc-code/casync-updater for detailed instructions).'
+echo 'Restart the casync-updater service after modifying configuration files for the changes to take effect.'
 echo -e "${NC}"
