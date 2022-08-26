@@ -77,6 +77,9 @@ function parseConfig(config) {
                     console.error(`Unable to find checksum for destination ${c.dstPath}: ${err}`)
                 });
 
+                // Execute startup actions
+                execStartup(c.startup);
+
                 // First run
                 runCycle(c.srcIndex, srcOptions, c.backupIndex, backupOptions, c.dstPath, dstOptions, c.triggers);
 
@@ -361,6 +364,24 @@ function execTriggers(diff, triggers) {
                         console.error(`Unable to process trigger action "${action}": ${err.message}`);
                     }
                 });
+            }
+        });
+    }
+}
+
+/**
+ * Execute list of startup commands
+ * @param {Array} startup 
+ */
+function execStartup(startup) {
+    if (startup && Array.isArray(startup)) {
+        startup.forEach(action => {
+            try {
+                console.log(`Executing startup action: "${action}"`);
+                exec(action, {shell: '/bin/bash'});
+            }
+            catch (err) {
+                console.error(`Unable to process startup action "${action}": ${err.message}`);
             }
         });
     }
