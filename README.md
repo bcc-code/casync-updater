@@ -86,6 +86,10 @@ Configuration file example:
                     "node yourscript.js"
                 ]
             }
+        ],
+        "startup": [
+            "first/command",
+            "second/command"
         ]
     }
 ]
@@ -97,7 +101,8 @@ where:
 * "backupIndex" (optional) is the path to the local backup casync index file (typically a location on external storage used for transferring updates to offline devices).
 * "backupStore" (required only when backupIndex is set) is the path to the local backup casync store directory.
 * "dstPath" is the local directory path to be updated
-* "triggers" a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
+* "triggers" is a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
+* "startup" is a list of commands that are executed on service startup.
 
 ## To do
 - [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
