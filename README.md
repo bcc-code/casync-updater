@@ -12,8 +12,11 @@ A simple self updating software update system with offline updating capabilities
 
 ## Installation
 ```shell
+sudo apt-get update
+sudo apt-get upgrade
 wget -q https://github.com/bcc-code/casync-updater/raw/master/deploy/install.sh -O - | sudo bash
 ```
+*Installation script only tested successfully on Raspberry Pi OS Buster & Ubuntu 20.04. It is not working on Ubuntu 18.04.*
 
 The casync-updater client is installed as a systemd service.
 Please run ```systemctl status casync-updater.service``` to ensure the service is running correctly.
