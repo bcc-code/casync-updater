@@ -16,9 +16,9 @@ echo -e "${NC}"
 echo -e "${BLUE}"
 echo 'Installing dependencies'
 echo -e "${NC}"
-apt-get install nodejs
-apt-get install casync
-apt-get install diffutils
+apt-get -y install nodejs
+apt-get -y install casync
+apt-get -y install diffutils
 
 # Create directory for nodejs scripts
 echo -e "${BLUE}"
