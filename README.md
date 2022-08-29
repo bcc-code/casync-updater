@@ -9,6 +9,7 @@ A simple self updating software update system with offline updating capabilities
 ## Dependencies
 * casync
 * diffutils
+* nodejs
 
 ## Installation
 ```shell
