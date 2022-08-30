@@ -25,7 +25,7 @@ function run(configPath) {
             });
         }
         else {
-            processEntry(c);
+            processEntry(config);
         }
     }).catch(err => {
         console.error(err);
