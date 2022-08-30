@@ -43,6 +43,22 @@ Configuration file example:
     "source": "/your/directory/source"
 }
 ```
+Configuration can also be passed as an array:
+```json
+[
+    {
+        "index": "/var/www/html/index.caidx",
+        "store": "/var/www/html/store.castr",
+        "source": "/your/directory/source"
+    },
+    {
+        "index": "/var/www/html/index2.caidx",
+        "store": "/var/www/html/store2.castr",
+        "source": "/your/directory/source2"
+    }
+]
+```
+
 where:
 * "index" is the path to the casync index file (typically stored in a web root directory).
 * "store" is the path to the casync store directory (typically stored in a web root directory).

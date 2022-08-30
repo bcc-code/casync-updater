@@ -18,58 +18,74 @@ if (process.argv.length > 2) {
 function run(configPath) {
     // Load configuration data passed via the first argument
     loadJSON(configPath).then(async (config) => {
-        // validate configuration file data
-        if (config && config.index && config.store && config.source) {
-            // casync options
-            let srcOptions = [
-                {with: '2sec-time'},    // This option seems to ignore user details
-            ];
-            let dstOptions = [
-                {store: config.store},
-                {with: '2sec-time'},
-            ];
-
-            // Calculate / get checksums
-            let dstChecksum, srcChecksum;
-            if (fs.existsSync(config.index)) {
-                await casync.digest(config.index, dstOptions).then(checksum => {
-                    dstChecksum = checksum;
-                }).catch(err => {
-                    console.error(`Unable to digest destination: ${err.message}`);
-                });
-            }
-            else {
-                console.log(`Destination directory is empty`);
-            }
-
-            await casync.digest(config.source, srcOptions).then(checksum => {
-                srcChecksum = checksum;
-            }).catch(err => {
-                console.error(`Unable to digest source: ${err.message}`);
-                process.exit(1);
+        // check if configuration is an array
+        if (Array.isArray(config)) {
+            config.forEach(c => {
+                processEntry(c);
             });
-
-            // Compare checksums to detect changes in the source
-            if (srcChecksum !== dstChecksum) {
-                // Create or update the archive
-                casync.make(config.index, config.source, dstOptions).then(data => {
-                    if (data.stderr && data.stderr != '') {
-                        console.log(stderr.toString());
-                    }
-                    else {
-                        console.log(`Created archive - checksum: ${data.stdout.trim()}`);
-                    }
-                }).catch(err => {
-                    console.error(`Unable to create archive: ${err}`);
-                    process.exit(1);
-                });
-            }
-            else {
-                console.log('Source not changed');
-            }
+        }
+        else {
+            processEntry(c);
         }
     }).catch(err => {
         console.error(err);
         process.exit(1);
     });
+}
+
+/**
+ * Process a configuration entry
+ * @param {Object} config 
+ */
+async function processEntry(config) {
+    // validate configuration file data
+    if (config && config.index && config.store && config.source) {
+        // casync options
+        let srcOptions = [
+            {with: '2sec-time'},    // This option seems to ignore user details
+        ];
+        let dstOptions = [
+            {store: config.store},
+            {with: '2sec-time'},
+        ];
+
+        // Calculate / get checksums
+        let dstChecksum, srcChecksum;
+        if (fs.existsSync(config.index)) {
+            await casync.digest(config.index, dstOptions).then(checksum => {
+                dstChecksum = checksum;
+            }).catch(err => {
+                console.error(`Unable to digest destination: ${err.message}`);
+            });
+        }
+        else {
+            console.log(`Destination directory is empty`);
+        }
+
+        await casync.digest(config.source, srcOptions).then(checksum => {
+            srcChecksum = checksum;
+        }).catch(err => {
+            console.error(`Unable to digest source: ${err.message}`);
+            process.exit(1);
+        });
+
+        // Compare checksums to detect changes in the source
+        if (srcChecksum !== dstChecksum) {
+            // Create or update the archive
+            casync.make(config.index, config.source, dstOptions).then(data => {
+                if (data.stderr && data.stderr != '') {
+                    console.log(stderr.toString());
+                }
+                else {
+                    console.log(`Created archive - checksum: ${data.stdout.trim()}`);
+                }
+            }).catch(err => {
+                console.error(`Unable to create archive: ${err}`);
+                process.exit(1);
+            });
+        }
+        else {
+            console.log('Source not changed');
+        }
+    }
 }
