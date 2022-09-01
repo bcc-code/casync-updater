@@ -122,7 +122,7 @@ where:
 * "backupStore" (required only when backupIndex is set) is the path to the local backup casync store directory.
 * "dstPath" is the local directory path to be updated
 * "triggers" is a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
-* "startup" is a list of commands that are executed on service startup.
+* "startup" is a list of commands that are executed on service startup. The startup commands are executed after the initial casync extract is complete and corresponding triggers are executed.
 
 ## To do
 - [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).

@@ -77,11 +77,11 @@ function parseConfig(config) {
                     console.error(`Unable to find checksum for destination ${c.dstPath}: ${err}`)
                 });
 
-                // Execute startup actions
-                execStartup(c.startup);
-
                 // First run
                 runCycle(c.srcIndex, srcOptions, c.backupIndex, backupOptions, c.dstPath, dstOptions, c.triggers);
+
+                // Execute startup actions
+                execStartup(c.startup);
 
                 // Start the interval timer
                 setInterval(async () => {
