@@ -78,7 +78,7 @@ function parseConfig(config) {
                 });
 
                 // First run
-                runCycle(c.srcIndex, srcOptions, c.backupIndex, backupOptions, c.dstPath, dstOptions, c.triggers);
+                await runCycle(c.srcIndex, srcOptions, c.backupIndex, backupOptions, c.dstPath, dstOptions, c.triggers);
 
                 // Execute startup actions
                 execStartup(c.startup);
