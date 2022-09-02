@@ -128,3 +128,4 @@ where:
 - [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
 - [ ] Secure backup store - prevent unintentional / malicious tampering with offline updates. (Ideas welcome)
 - [ ] Distribute casync-updater updates via CDN (and not directly from GitHub pages due to usage limits).
+- [ ] Prevent client.js from terminating while busy executing a cycle.
