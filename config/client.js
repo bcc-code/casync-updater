@@ -358,7 +358,8 @@ function execTriggers(diff, triggers) {
                 trigger.actions.forEach(action => {
                     try {
                         console.log(`Executing trigger action: "${action}"`);
-                        console.log(execSync(action, {shell: '/bin/bash'}));
+                        let output = execSync(action, {shell: '/bin/bash'});
+                        console.log(output.toString());
                     }
                     catch (err) {
                         console.error(`Unable to process trigger action "${action}": ${err.message}`);
@@ -378,7 +379,8 @@ function execStartup(startup) {
         startup.forEach(action => {
             try {
                 console.log(`Executing startup action: "${action}"`);
-                console.log(execSync(action, {shell: '/bin/bash'}));
+                let output = execSync(action, {shell: '/bin/bash'});
+                console.log(output.toString());
             }
             catch (err) {
                 console.error(`Unable to process startup action "${action}": ${err.message}`);
