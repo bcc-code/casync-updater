@@ -13,6 +13,11 @@ const { exec, execSync } = require('child_process');
  */
 var checksum = {};
 
+/**
+ * Trigger actions cache
+ */
+var tActions = {};
+
 // Load config and make casync archive
 if (process.argv.length > 2) {
     let path = process.argv[2];
@@ -357,6 +362,8 @@ function execTriggers(diff, triggers) {
                 // Execute triggers
                 trigger.actions.forEach(action => {
                     try {
+                        // Add action to trigger actions cache to prevent re-running the trigger if also called from the startup actions
+                        tActions[action] = true;
                         console.log(`Executing trigger action: "${action}"`);
                         let output = execSync(action, {shell: '/bin/bash'});
                         console.log(output.toString());
@@ -377,13 +384,16 @@ function execTriggers(diff, triggers) {
 function execStartup(startup) {
     if (startup && Array.isArray(startup)) {
         startup.forEach(action => {
-            try {
-                console.log(`Executing startup action: "${action}"`);
-                let output = execSync(action, {shell: '/bin/bash'});
-                console.log(output.toString());
-            }
-            catch (err) {
-                console.error(`Unable to process startup action "${action}": ${err.message}`);
+            // Only run the startup action / command if the action has not already been triggered during the first cycle run.
+            if (!tActions[action]) {
+                try {
+                    console.log(`Executing startup action: "${action}"`);
+                    let output = execSync(action, {shell: '/bin/bash'});
+                    console.log(output.toString());
+                }
+                catch (err) {
+                    console.error(`Unable to process startup action "${action}": ${err.message}`);
+                }
             }
         });
     }
