@@ -6,7 +6,7 @@ const { loadJSON, saveJSON } = require("./json.js");
 const fs = require('fs');
 const path = require('path');
 const { casync } = require('./casync.js');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 
 /**
  * Checksum cache
@@ -358,7 +358,7 @@ function execTriggers(diff, triggers) {
                 trigger.actions.forEach(action => {
                     try {
                         console.log(`Executing trigger action: "${action}"`);
-                        exec(action, {shell: '/bin/bash'});
+                        console.log(execSync(action, {shell: '/bin/bash'}));
                     }
                     catch (err) {
                         console.error(`Unable to process trigger action "${action}": ${err.message}`);
@@ -378,7 +378,7 @@ function execStartup(startup) {
         startup.forEach(action => {
             try {
                 console.log(`Executing startup action: "${action}"`);
-                exec(action, {shell: '/bin/bash'});
+                console.log(execSync(action, {shell: '/bin/bash'}));
             }
             catch (err) {
                 console.error(`Unable to process startup action "${action}": ${err.message}`);
