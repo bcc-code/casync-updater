@@ -93,7 +93,7 @@ class casync {
                 }
             }).catch(output => {
                 if (output.stderr) {
-                    reject(stderr.trim());
+                    reject(output.stderr.trim());
                 }
                 else if (output.stdout) {
                     // Parse the diff output
