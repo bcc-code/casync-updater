@@ -122,9 +122,10 @@ where:
 * "backupStore" (required only when backupIndex is set) is the path to the local backup casync store directory.
 * "dstPath" is the local directory path to be updated
 * "triggers" is a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
-* "startup" is a list of commands that are executed on service startup. The startup commands are executed after the initial casync extract is complete and corresponding triggers are executed.
+* "startup" is a list of commands that are executed on service startup. The startup commands are executed after the initial casync extract is complete and corresponding triggers are executed. If the exact same action / command was triggered during the cycle, the given action will not be run by the startup trigger.
 
 ## To do
 - [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
 - [ ] Secure backup store - prevent unintentional / malicious tampering with offline updates. (Ideas welcome)
 - [ ] Distribute casync-updater updates via CDN (and not directly from GitHub pages due to usage limits).
+- [ ] Prevent client.js from terminating while busy executing a cycle.
