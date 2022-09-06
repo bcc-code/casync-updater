@@ -7,6 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const { casync } = require('./casync.js');
 const { exec, execSync } = require('child_process');
+const http = require('http');
+const https = require('https');
 
 /**
  * Checksum cache
@@ -18,6 +20,7 @@ var checksum = {};
  */
 var tActions = {};
 
+setTimeout(() => {
 // Load config and make casync archive
 if (process.argv.length > 2) {
     let path = process.argv[2];
@@ -37,6 +40,8 @@ if (process.argv.length > 2) {
         console.error(`Error reading configuration file or directory ${path}}: ${err}`);
     }
 }
+}, 1000);
+
 
 /**
  * Load a configuration file and parse the config
@@ -51,6 +56,73 @@ function loadFile(path) {
 }
 
 /**
+ * Read checksum from disk / web
+ * @param {*} index - casync index file path
+ * @returns - Promise with the checksum (if found) or an empty promise (if not found);
+ */
+function readChecksum(index) {
+    return new Promise((resolve, reject) => {
+        // Determine if index is on disk or web
+        if (index.startsWith('https')) {
+            // Assume web (https)
+            https.get(index + ".cks", response => {
+                if (response.statusCode == 200) {
+                    response.on('data', data => {
+                        resolve(data.toString());
+                    });
+                }
+                else {
+                    resolve();
+                }
+            });
+        }
+        else if (index.startsWith('http')) {
+            // Assume web (http)
+            http.get(index + ".cks", response => {
+                if (response.statusCode == 200) {
+                    response.on('data', data => {
+                        resolve(data.toString());
+                    });
+                }
+                else {
+                    resolve();
+                }
+            });
+        }
+        else if (index.startsWith('ftp')) {
+            // Not implemented
+            console.log('Checksum retrieval from FTP not supported.')
+            resolve();
+        }
+        else {
+            // Assume local file path
+            try {
+                let checksum = fs.readFileSync(index + ".cks").toString();
+                resolve(checksum);
+            }
+            catch (error) {
+                console.log(`Unable to read checksum file: ${index + ".cks"}\n${error.message}`);
+                resolve();
+            }
+        }
+    });
+}
+
+/**
+ * Write checksum to disk
+ * @param {*} index - casync index file path
+ * @param {*} checksum - checksum string
+ */
+function writeChecksum(index, checksum) {
+    try {
+        fs.writeFileSync(index + ".cks", checksum);
+    }
+    catch (error) {
+        console.log(`Unable to write checksum file: ${index + ".cks"}`);
+    }
+}
+
+/**
  * Parse a configuration object, and schedule updaters
  * @param {object} config 
  */
@@ -60,19 +132,18 @@ function parseConfig(config) {
             // Check for valid configuration entry
             if (c.interval && c.srcIndex && c.srcStore && c.dstPath) {
                 let srcOptions = [
-                    {store: c.srcStore},
-                    {with: '2sec-time'},  // This option seems to ignore user details
+                    { store: c.srcStore },
+                    { with: '2sec-time' },  // This option seems to ignore user details
                 ];
 
                 let dstOptions = [
-                    {with: '2sec-time'},
+                    { with: '2sec-time' },
                 ];
 
                 let backupOptions = [
-                    {store: c.backupStore},
-                    {with: '2sec-time'},
+                    { store: c.backupStore },
+                    { with: '2sec-time' },
                 ];
-
 
                 // Get destination checksum
                 await casync.digest(c.dstPath, dstOptions).then(data => {
@@ -113,25 +184,44 @@ function parseConfig(config) {
  * @param {*} dstOptions 
  * @param {*} triggers
  */
- async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
-    // Get the source checksum
+async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
+    // Read the source checksum file
     let sourceChecksum;
-    await casync.digest(srcIndex, srcOptions).then(data => {
-        sourceChecksum = data.trim();
-        // console.log(`Found checksum for source ${srcIndex}`);
+    await readChecksum(srcIndex).then(data => {
+        sourceChecksum = data;
     }).catch(err => {
-        console.log(`Source index not available: ${srcIndex}`);
+        console.log(`Unable to fetch checksum file for: ${srcIndex}: ${err.message}`);
     });
+
+    // If the source checksum file is not available, calculate the source checksum (less efficient)
+    if (!sourceChecksum) {
+        await casync.digest(srcIndex, srcOptions).then(data => {
+            sourceChecksum = data.trim();
+            // console.log(`Found checksum for source ${srcIndex}`);
+        }).catch(err => {
+            console.log(`Source index not available: ${srcIndex}`);
+        });
+    }
 
     // Get the backup checksum
     let backupChecksum;
     if (backupIndex && backupOptions) {
-        await casync.digest(backupIndex, backupOptions).then(data => {
-            backupChecksum = data.trim();
-            // console.log(`Found checksum for backup: ${backupIndex}`);
+        // Read the backup checksum file
+        await readChecksum(backupIndex).then(data => {
+            backupChecksum = data;
         }).catch(err => {
-            console.log(`Backup index not available: ${backupIndex}`);
+            console.log(`Unable to fetch checksum file for: ${backupIndex}: ${err.message}`);
         });
+
+        // If the backup checksum file is not available, calculate the backup checksum (less efficient)
+        if (!backupChecksum) {
+            await casync.digest(backupIndex, backupOptions).then(data => {
+                backupChecksum = data.trim();
+                // console.log(`Found checksum for backup: ${backupIndex}`);
+            }).catch(err => {
+                console.log(`Backup index not available: ${backupIndex}`);
+            });
+        }
     }
 
     // Check if source checksum changed (or first run)
@@ -162,7 +252,7 @@ function parseConfig(config) {
         execTriggers(diff, triggers);
     }
     // If the source is not available, try to extract from backup source
-    else if (!sourceChecksum && backupChecksum && checksum[dstPath] && 
+    else if (!sourceChecksum && backupChecksum && checksum[dstPath] &&
         checksum[dstPath] !== backupChecksum) {
         await extractBackup(backupIndex, backupOptions, dstPath, dstOptions).then(data => {
             if (data) {
@@ -232,23 +322,8 @@ function extract(srcIndex, srcOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid destination
         if (dirExists(dstPath)) {
-            casync.extract(srcIndex, dstPath, srcOptions).then(data => {
-                if (data && data.stderr === '') {
-                    // Get destination checksum
-                    casync.digest(dstPath, dstOptions).then(data => {
-                        resolve(data);
-                    }).catch(err => {
-                        reject(err);
-                    });
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
+            casync.extract(srcIndex, dstPath, srcOptions).then(checksum => {
+                resolve(checksum)
             }).catch(err => {
                 reject(err);
             });
@@ -271,33 +346,22 @@ function makeBackup(srcPath, dstIndex, dstOptions) {
         let dstDir = path.dirname(dstIndex);
         let srcExist = dirExists(srcPath);
         let srcEmpty = false;
-        if (srcExist) {srcEmpty = isEmptyDir(srcPath)}
+        if (srcExist) { srcEmpty = isEmptyDir(srcPath) }
         let dstExist = dirExists(dstDir);
 
         // Check for valid index and source
         if (srcExist && !srcEmpty && dstExist) {
-            casync.make(dstIndex, srcPath, dstOptions).then(data => {
-                if (data && data.stderr === ''  && data.stdout) {
-                    // Resolve the checksum
-                    resolve(data.stdout.trim());
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
+            casync.make(dstIndex, srcPath, dstOptions).then(checksum => {
+                resolve(checksum);
             }).catch(err => {
                 reject(err);
             });
         }
         else {
             let msg = '';
-            if (!srcExist) {msg += `Source directory ${srcPath} does not exist; `}
-            else if (srcEmpty) {msg += `Source directory ${srcPath} is empty; `}
-            if (!dstExist) {msg += `Destination directory ${dstDir} does not exist; `}
+            if (!srcExist) { msg += `Source directory ${srcPath} does not exist; ` }
+            else if (srcEmpty) { msg += `Source directory ${srcPath} is empty; ` }
+            if (!dstExist) { msg += `Destination directory ${dstDir} does not exist; ` }
             reject(msg);
         }
     });
@@ -315,23 +379,8 @@ function extractBackup(backupIndex, backupOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid data and valid destination
         if (dirExists(dstPath) && fs.existsSync(backupIndex)) {
-            casync.extract(backupIndex, dstPath, backupOptions).then(data => {
-                if (data && data.stderr === '') {
-                    // Get destination checksum
-                    casync.digest(dstPath, dstOptions).then(data => {
-                        resolve(data);
-                    }).catch(err => {
-                        reject(err);
-                    });
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
+            casync.extract(backupIndex, dstPath, backupOptions).then(checksum => {
+                resolve(checksum);
             }).catch(err => {
                 reject(err);
             });
@@ -358,14 +407,14 @@ function execTriggers(diff, triggers) {
                     found = diff.includes(trigger.paths[i]);
                     i++;
                 }
-    
+
                 // Execute triggers
                 trigger.actions.forEach(action => {
                     try {
                         // Add action to trigger actions cache to prevent re-running the trigger if also called from the startup actions
                         tActions[action] = true;
                         console.log(`Executing trigger action: "${action}"`);
-                        let output = execSync(action, {shell: '/bin/bash'});
+                        let output = execSync(action, { shell: '/bin/bash' });
                         console.log(output.toString());
                     }
                     catch (err) {
@@ -388,7 +437,7 @@ function execStartup(startup) {
             if (!tActions[action]) {
                 try {
                     console.log(`Executing startup action: "${action}"`);
-                    let output = execSync(action, {shell: '/bin/bash'});
+                    let output = execSync(action, { shell: '/bin/bash' });
                     console.log(output.toString());
                 }
                 catch (err) {
