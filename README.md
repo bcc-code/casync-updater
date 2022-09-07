@@ -131,7 +131,7 @@ The casync-updater client (```client.js```) checks the source casync archive che
 casync mtree output is also handled in a similar way (used to detect changes for triggers). The mtree output is saved to a ```.mtree``` file when creating an casync archive.
 
 ## To do
-- [*] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
+- [ * ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
 - [ ] Secure backup store - prevent unintentional / malicious tampering with offline updates. (Ideas welcome)
 - [ ] Distribute casync-updater updates via CDN (and not directly from GitHub pages due to usage limits).
 - [ ] Prevent client.js from terminating while busy executing a cycle.
