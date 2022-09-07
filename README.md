@@ -1,4 +1,4 @@
-[![Deployment status: master](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml/badge.svg?branch=master)](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml)
+[![Deployment status](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml/badge.svg?branch=master)](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml)
 # casync-updater
 casync based OTA updater for software running on linux
 

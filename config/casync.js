@@ -202,7 +202,7 @@ class casync {
     static readFile(path) {
         return new Promise((resolve, reject) => {
             // Determine if index is on disk or web
-            if (index.startsWith('https')) {
+            if (path.startsWith('https')) {
                 // Assume web (https)
                 https.get(path, response => {
                     if (response.statusCode == 200) {
