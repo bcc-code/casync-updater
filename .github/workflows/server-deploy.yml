@@ -1,10 +1,12 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Make casync archive - master
+name: Deployment
 
 on:
   # Runs on pushes targeting the default branch
   push:
-    branches: ["master"]
+    branches: 
+      - master
+      - beta
     paths:
       - 'config/**'
 
@@ -30,16 +32,28 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
       - name: install casync
         run: sudo apt-get install casync
       - name: install nodejs
         run: sudo apt-get install nodejs
-      - name: create output directory
-        run: sudo mkdir /casync-update
-      - name: casync make
-        run: sudo node config/server.js .github/workflows/server.json
+      - name: Checkout master
+        uses: actions/checkout@v3
+        with:
+          ref: 'master'
+          fetch-depth: 1
+      - name: create output directory - master
+        run: sudo mkdir -p /casync-update/master
+      - name: casync make - master
+        run: sudo node config/server.js .github/workflows/master.json
+      - name: Checkout beta
+        uses: actions/checkout@v3
+        with:
+          ref: 'beta'
+          fetch-depth: 1
+      - name: create output directory - beta
+        run: sudo mkdir -p /casync-update/beta
+      - name: casync make - beta
+        run: sudo node config/server.js .github/workflows/beta.json
       - name: Setup Pages
         uses: actions/configure-pages@v1
       - name: Upload artifact
