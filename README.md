@@ -1,4 +1,4 @@
-[![Deployment status: master](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml/badge.svg?branch=master)](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml)
+[![Deployment status](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml/badge.svg?branch=master)](https://github.com/bcc-code/casync-updater/actions/workflows/server-deploy.yml)
 # casync-updater
 casync based OTA updater for software running on linux
 
@@ -124,6 +124,11 @@ where:
 * "dstPath" is the local directory path to be updated
 * "triggers" is a list of paths and associated actions. When one of the specified "paths" (relative directory or file path) is updated, the list of "actions" is executed (shell commands).
 * "startup" is a list of commands that are executed on service startup. The startup commands are executed after the initial casync extract is complete and corresponding triggers are executed. If the exact same action / command was triggered during the cycle, the given action will not be run by the startup trigger.
+
+## Improving performance
+The casync-updater client (```client.js```) checks the source casync archive checksum, and compares it to the destination location's checksum before extracting the changes. Digesting the checksum is however not efficient (network usage wise). The casync-updater server (```server.js```) therefore creates a ```.cks``` file containing the latest checksum. The client tries to download the checksum file, and if it exists uses that checksum to compare to the destination location's checksum. If the checksum file is not found in the source location, it will do a full digest to calculate the source checksum.
+
+casync mtree output is also handled in a similar way (used to detect changes for triggers). The mtree output is saved to a ```.mtree``` file when creating an casync archive.
 
 ## To do
 - [ ] Save the server checksum to file to reduce bandwidth for client update checks (i.e. do not download the full index file to get the latest server checksum).
