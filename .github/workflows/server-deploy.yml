@@ -42,7 +42,7 @@ jobs:
           ref: 'master'
           fetch-depth: 1
       - name: create output directory - master
-        run: sudo mkdir /casync-update
+        run: sudo mkdir -p /casync-update/master
       - name: casync make - master
         run: sudo node config/server.js .github/workflows/master.json
       - name: Checkout beta
@@ -51,7 +51,7 @@ jobs:
           ref: 'beta'
           fetch-depth: 1
       - name: create output directory - beta
-        run: sudo mkdir /casync-update/beta
+        run: sudo mkdir -p /casync-update/beta
       - name: casync make - beta
         run: sudo node config/server.js .github/workflows/beta.json
       - name: Setup Pages
