@@ -157,10 +157,10 @@ class casync {
 
             // Check if mtree file output is valid, and run mtree if not valid
             if (!mtree1) {
-                await this.mtree(source1, options1).then(data => { mtree1 = data });
+                await this.mtree(source1, options1).then(data => { mtree1 = data }).catch(err => { reject(err) });
             }
             if (!mtree2) {
-                await this.mtree(source2, options2).then(data => { mtree2 = data });
+                await this.mtree(source2, options2).then(data => { mtree2 = data }).catch(err => { reject(err) });
             }
 
             // Use the built-in shell diff command to compare the outputs of mtree commands on both sources.

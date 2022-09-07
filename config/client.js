@@ -56,73 +56,6 @@ function loadFile(path) {
 }
 
 /**
- * Read checksum from disk / web
- * @param {*} index - casync index file path
- * @returns - Promise with the checksum (if found) or an empty promise (if not found);
- */
-function readChecksum(index) {
-    return new Promise((resolve, reject) => {
-        // Determine if index is on disk or web
-        if (index.startsWith('https')) {
-            // Assume web (https)
-            https.get(index + ".cks", response => {
-                if (response.statusCode == 200) {
-                    response.on('data', data => {
-                        resolve(data.toString());
-                    });
-                }
-                else {
-                    resolve();
-                }
-            });
-        }
-        else if (index.startsWith('http')) {
-            // Assume web (http)
-            http.get(index + ".cks", response => {
-                if (response.statusCode == 200) {
-                    response.on('data', data => {
-                        resolve(data.toString());
-                    });
-                }
-                else {
-                    resolve();
-                }
-            });
-        }
-        else if (index.startsWith('ftp')) {
-            // Not implemented
-            console.log('Checksum retrieval from FTP not supported.')
-            resolve();
-        }
-        else {
-            // Assume local file path
-            try {
-                let checksum = fs.readFileSync(index + ".cks").toString();
-                resolve(checksum);
-            }
-            catch (error) {
-                console.log(`Unable to read checksum file: ${index + ".cks"}\n${error.message}`);
-                resolve();
-            }
-        }
-    });
-}
-
-/**
- * Write checksum to disk
- * @param {*} index - casync index file path
- * @param {*} checksum - checksum string
- */
-function writeChecksum(index, checksum) {
-    try {
-        fs.writeFileSync(index + ".cks", checksum);
-    }
-    catch (error) {
-        console.log(`Unable to write checksum file: ${index + ".cks"}`);
-    }
-}
-
-/**
  * Parse a configuration object, and schedule updaters
  * @param {object} config 
  */
@@ -185,43 +118,24 @@ function parseConfig(config) {
  * @param {*} triggers
  */
 async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
-    // Read the source checksum file
+    // Get the source checksum
     let sourceChecksum;
-    await readChecksum(srcIndex).then(data => {
-        sourceChecksum = data;
+    await casync.digest(srcIndex, srcOptions).then(data => {
+        sourceChecksum = data.trim();
+        // console.log(`Found checksum for source ${srcIndex}`);
     }).catch(err => {
-        console.log(`Unable to fetch checksum file for: ${srcIndex}: ${err.message}`);
+        console.log(`Source index not available: ${srcIndex}`);
     });
-
-    // If the source checksum file is not available, calculate the source checksum (less efficient)
-    if (!sourceChecksum) {
-        await casync.digest(srcIndex, srcOptions).then(data => {
-            sourceChecksum = data.trim();
-            // console.log(`Found checksum for source ${srcIndex}`);
-        }).catch(err => {
-            console.log(`Source index not available: ${srcIndex}`);
-        });
-    }
 
     // Get the backup checksum
     let backupChecksum;
     if (backupIndex && backupOptions) {
-        // Read the backup checksum file
-        await readChecksum(backupIndex).then(data => {
-            backupChecksum = data;
+        await casync.digest(backupIndex, backupOptions).then(data => {
+            backupChecksum = data.trim();
+            // console.log(`Found checksum for backup: ${backupIndex}`);
         }).catch(err => {
-            console.log(`Unable to fetch checksum file for: ${backupIndex}: ${err.message}`);
+            console.log(`Backup index not available: ${backupIndex}`);
         });
-
-        // If the backup checksum file is not available, calculate the backup checksum (less efficient)
-        if (!backupChecksum) {
-            await casync.digest(backupIndex, backupOptions).then(data => {
-                backupChecksum = data.trim();
-                // console.log(`Found checksum for backup: ${backupIndex}`);
-            }).catch(err => {
-                console.log(`Backup index not available: ${backupIndex}`);
-            });
-        }
     }
 
     // Check if source checksum changed (or first run)
