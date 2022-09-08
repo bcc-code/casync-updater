@@ -99,15 +99,17 @@ class casync {
     }
 
     static _optionString(options) {
-        try {
-            let s = '';
-            options.forEach(option => {
-                s += '--' + Object.keys(option)[0] + '=' + Object.values(option)[0] + ' ';
-            });
-            return s;
-        }
-        catch {
-            throw Error('Invalid options format');
+        if (options) {
+            try {
+                let s = '';
+                options.forEach(option => {
+                    s += '--' + Object.keys(option)[0] + '=' + Object.values(option)[0] + ' ';
+                });
+                return s;
+            }
+            catch {
+                throw Error('Invalid options format');
+            }
         }
     }
 

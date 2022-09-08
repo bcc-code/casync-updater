@@ -234,8 +234,12 @@ function extract(srcIndex, srcOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid destination
         if (dirExists(dstPath)) {
-            casync.extract(srcIndex, dstPath, srcOptions).then(checksum => {
-                resolve(checksum)
+            casync.extract(srcIndex, dstPath, srcOptions).then(() => {
+                casync.digest(dstPath).then(checksum => {
+                    resolve(checksum)
+                }).catch(err => {
+                    reject(err);
+                });
             }).catch(err => {
                 reject(err);
             });
@@ -291,10 +295,12 @@ function extractBackup(backupIndex, backupOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid data and valid destination
         if (dirExists(dstPath) && fs.existsSync(backupIndex)) {
-            casync.extract(backupIndex, dstPath, backupOptions).then(checksum => {
-                resolve(checksum);
-            }).catch(err => {
-                reject(err);
+            casync.extract(backupIndex, dstPath, backupOptions).then(() => {
+                casync.digest(dstPath).then(checksum => {
+                    resolve(checksum)
+                }).catch(err => {
+                    reject(err);
+                });
             });
         }
         else {
