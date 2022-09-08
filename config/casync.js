@@ -4,10 +4,7 @@
 
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
-const http = require('http');
-const https = require('https');
 const fs = require('fs');
-const zlib = require('zlib');
 
 /**
  * Nodejs wrapper for casync (see https://github.com/systemd/casync) with added functionality
@@ -151,9 +148,9 @@ class casync {
         return new Promise(async (resolve, reject) => {
             // Get mtree file(s)
             let mtree1;
-            await this.readFile(source1 + ".mtree").then(data => { mtree1 = data });
+            await this.readFile(source1 + ".mtree").then(data => { mtree1 = data }).catch(err => {});
             let mtree2;
-            await this.readFile(source2 + ".mtree").then(data => { mtree2 = data });
+            await this.readFile(source2 + ".mtree").then(data => { mtree2 = data }).catch(err => {});
 
             // Check if mtree file output is valid, and run mtree if not valid
             if (!mtree1) {
@@ -202,48 +199,55 @@ class casync {
     static readFile(path) {
         return new Promise((resolve, reject) => {
             // Determine if index is on disk or web
-            if (path.startsWith('https')) {
-                // Assume web (https)
-                https.get(path, response => {
-                    if (response.statusCode == 200) {
-                        response.on('data', data => {
-                            let unzip = zlib.gunzipSync(data, 'utf8');
-                            resolve(unzip.toString());
-                        });
-                    }
-                    else {
-                        resolve();
-                    }
+            if (path.startsWith('http') || path.startsWith('ftp')) {
+                this.wget(path).then(data => {
+                    resolve(data);
+                }).catch(err => {
+                    reject(err);
                 });
-            }
-            else if (path.startsWith('http')) {
-                // Assume web (http)
-                http.get(path, response => {
-                    if (response.statusCode == 200) {
-                        response.on('data', data => {
-                            let unzip = zlib.gunzipSync(data, 'utf8');
-                            resolve(unzip.toString());
-                        });
-                    }
-                    else {
-                        resolve();
-                    }
-                });
-            }
-            else if (path.startsWith('ftp')) {
-                // Not implemented
-                reject('Checksum retrieval from FTP not supported.')
             }
             else {
                 // Assume local file path
                 try {
                     let data = fs.readFileSync(path);
-                    let unzip = zlib.gunzipSync(data, 'utf8');
-                    resolve(unzip.toString());
+                    resolve(data.toString());
                 }
                 catch (error) {
                     resolve();
                 }
+            }
+        });
+    }
+
+    /**
+     * Download a file with wget, and return the file contents
+     * @param {*} url 
+     * @returns - Returns a promise with the text data when complete
+     */
+    static wget(url) {
+        return new Promise((resolve, reject) => {
+            try {
+                let cmd = `wget -q --retry-connrefused --tries=10 --no-http-keep-alive -O '-'
+                --header 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
+                --header 'Accept-Encoding: gzip, deflate, br'
+                --header 'Accept-Language: en-US,en;q=0.9,no;q=0.8,fr;q=0.7'
+                --header 'User-Agent: Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36'
+                '${url}'`.replace(/\n/g, ' ');  // replace newline characters with space
+
+                exec(cmd, { maxBuffer: 1024000000 }).then(data => {     // Increased maxbuffer to allow large files to be downloaded (default is 200kb(?)).
+                    if (data.stderr) {
+                        reject(data.stderr);
+                    }
+                    else if (data.stdout) {
+                        resolve(data.stdout);
+                    }
+                    else {
+                        resolve();
+                    }
+                });
+            }
+            catch (error) {
+                reject(error.message);
             }
         });
     }
@@ -254,8 +258,7 @@ class casync {
      * @param {*} data - data
      */
     static writeFile(path, data) {
-        let zip = zlib.gzipSync(Buffer.from(data, 'utf8'));
-        fs.writeFileSync(path, zip);
+        fs.writeFileSync(path, data);
     }
 }
 
