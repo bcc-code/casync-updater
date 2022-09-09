@@ -18,6 +18,7 @@ var checksum = {};
  */
 var tActions = {};
 
+setTimeout(() => {
 // Load config and make casync archive
 if (process.argv.length > 2) {
     let path = process.argv[2];
@@ -37,6 +38,8 @@ if (process.argv.length > 2) {
         console.error(`Error reading configuration file or directory ${path}}: ${err}`);
     }
 }
+}, 1000);
+
 
 /**
  * Load a configuration file and parse the config
@@ -60,19 +63,18 @@ function parseConfig(config) {
             // Check for valid configuration entry
             if (c.interval && c.srcIndex && c.srcStore && c.dstPath) {
                 let srcOptions = [
-                    {store: c.srcStore},
-                    {with: '2sec-time'},  // This option seems to ignore user details
+                    { store: c.srcStore },
+                    { with: '2sec-time' },  // This option seems to ignore user details
                 ];
 
                 let dstOptions = [
-                    {with: '2sec-time'},
+                    { with: '2sec-time' },
                 ];
 
                 let backupOptions = [
-                    {store: c.backupStore},
-                    {with: '2sec-time'},
+                    { store: c.backupStore },
+                    { with: '2sec-time' },
                 ];
-
 
                 // Get destination checksum
                 await casync.digest(c.dstPath, dstOptions).then(data => {
@@ -113,7 +115,7 @@ function parseConfig(config) {
  * @param {*} dstOptions 
  * @param {*} triggers
  */
- async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
+async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
     // Get the source checksum
     let sourceChecksum;
     await casync.digest(srcIndex, srcOptions).then(data => {
@@ -162,7 +164,7 @@ function parseConfig(config) {
         execTriggers(diff, triggers);
     }
     // If the source is not available, try to extract from backup source
-    else if (!sourceChecksum && backupChecksum && checksum[dstPath] && 
+    else if (!sourceChecksum && backupChecksum && checksum[dstPath] &&
         checksum[dstPath] !== backupChecksum) {
         await extractBackup(backupIndex, backupOptions, dstPath, dstOptions).then(data => {
             if (data) {
@@ -232,23 +234,12 @@ function extract(srcIndex, srcOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid destination
         if (dirExists(dstPath)) {
-            casync.extract(srcIndex, dstPath, srcOptions).then(data => {
-                if (data && data.stderr === '') {
-                    // Get destination checksum
-                    casync.digest(dstPath, dstOptions).then(data => {
-                        resolve(data);
-                    }).catch(err => {
-                        reject(err);
-                    });
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
+            casync.extract(srcIndex, dstPath, srcOptions).then(() => {
+                casync.digest(dstPath).then(checksum => {
+                    resolve(checksum)
+                }).catch(err => {
+                    reject(err);
+                });
             }).catch(err => {
                 reject(err);
             });
@@ -271,33 +262,22 @@ function makeBackup(srcPath, dstIndex, dstOptions) {
         let dstDir = path.dirname(dstIndex);
         let srcExist = dirExists(srcPath);
         let srcEmpty = false;
-        if (srcExist) {srcEmpty = isEmptyDir(srcPath)}
+        if (srcExist) { srcEmpty = isEmptyDir(srcPath) }
         let dstExist = dirExists(dstDir);
 
         // Check for valid index and source
         if (srcExist && !srcEmpty && dstExist) {
-            casync.make(dstIndex, srcPath, dstOptions).then(data => {
-                if (data && data.stderr === ''  && data.stdout) {
-                    // Resolve the checksum
-                    resolve(data.stdout.trim());
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
+            casync.make(dstIndex, srcPath, dstOptions).then(checksum => {
+                resolve(checksum);
             }).catch(err => {
                 reject(err);
             });
         }
         else {
             let msg = '';
-            if (!srcExist) {msg += `Source directory ${srcPath} does not exist; `}
-            else if (srcEmpty) {msg += `Source directory ${srcPath} is empty; `}
-            if (!dstExist) {msg += `Destination directory ${dstDir} does not exist; `}
+            if (!srcExist) { msg += `Source directory ${srcPath} does not exist; ` }
+            else if (srcEmpty) { msg += `Source directory ${srcPath} is empty; ` }
+            if (!dstExist) { msg += `Destination directory ${dstDir} does not exist; ` }
             reject(msg);
         }
     });
@@ -315,25 +295,12 @@ function extractBackup(backupIndex, backupOptions, dstPath, dstOptions) {
     return new Promise((resolve, reject) => {
         // Check for valid data and valid destination
         if (dirExists(dstPath) && fs.existsSync(backupIndex)) {
-            casync.extract(backupIndex, dstPath, backupOptions).then(data => {
-                if (data && data.stderr === '') {
-                    // Get destination checksum
-                    casync.digest(dstPath, dstOptions).then(data => {
-                        resolve(data);
-                    }).catch(err => {
-                        reject(err);
-                    });
-                }
-                else {
-                    if (data && data.stderr) {
-                        reject(data.stderr.trim());
-                    }
-                    else {
-                        reject('');
-                    }
-                }
-            }).catch(err => {
-                reject(err);
+            casync.extract(backupIndex, dstPath, backupOptions).then(() => {
+                casync.digest(dstPath).then(checksum => {
+                    resolve(checksum)
+                }).catch(err => {
+                    reject(err);
+                });
             });
         }
         else {
@@ -358,14 +325,14 @@ function execTriggers(diff, triggers) {
                     found = diff.includes(trigger.paths[i]);
                     i++;
                 }
-    
+
                 // Execute triggers
                 trigger.actions.forEach(action => {
                     try {
                         // Add action to trigger actions cache to prevent re-running the trigger if also called from the startup actions
                         tActions[action] = true;
                         console.log(`Executing trigger action: "${action}"`);
-                        let output = execSync(action, {shell: '/bin/bash'});
+                        let output = execSync(action, { shell: '/bin/bash' });
                         console.log(output.toString());
                     }
                     catch (err) {
@@ -388,7 +355,7 @@ function execStartup(startup) {
             if (!tActions[action]) {
                 try {
                     console.log(`Executing startup action: "${action}"`);
-                    let output = execSync(action, {shell: '/bin/bash'});
+                    let output = execSync(action, { shell: '/bin/bash' });
                     console.log(output.toString());
                 }
                 catch (err) {
