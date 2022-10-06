@@ -3,7 +3,8 @@
  */
 
 const util = require('util');
-const exec = util.promisify(require('child_process').exec);
+const execP = util.promisify(require('child_process').exec);
+const { exec } = require('child_process');
 const fs = require('fs');
 
 /**
@@ -19,7 +20,7 @@ class casync {
      */
     static make(index, source, options) {
         return new Promise((resolve, reject) => {
-            exec(`casync make ${this._optionString(options)} ${index} ${source}`).then(data => {
+            execP(`casync make ${this._optionString(options)} ${index} ${source}`).then(data => {
                 if (data.stderr && data.stderr != '') {
                     reject(data.stderr.toString());
                 }
@@ -55,7 +56,7 @@ class casync {
      */
     static extract(index, destination, options) {
         return new Promise((resolve, reject) => {
-            exec(`casync extract ${this._optionString(options)} ${index} ${destination}`).then(data => {
+            execP(`casync extract ${this._optionString(options)} ${index} ${destination}`).then(data => {
                 if (data.stderr && data.stderr != '') {
                     reject(data.stderr.toString());
                 }
@@ -86,7 +87,7 @@ class casync {
                 }
                 else {
                     // Digest target
-                    exec(`casync digest ${this._optionString(options)} ${target}`).then(data => {
+                    execP(`casync digest ${this._optionString(options)} ${target}`).then(data => {
                         resolve(data.stdout.trim());
                     }).catch(err => {
                         reject(err.message);
@@ -122,7 +123,7 @@ class casync {
     static mtree(target, options) {
         return new Promise((resolve, reject) => {
             let cmd = `casync mtree ${this._optionString(options)} ${target}`;
-            exec(cmd, { shell: '/bin/bash' , maxBuffer: 1024000000}).then(data => {
+            execP(cmd, { shell: '/bin/bash' , maxBuffer: 1024000000}).then(data => {
                 if (data.stderr && data.stderr != '') {
                     reject(data.stderr.toString());
                 }
@@ -163,10 +164,10 @@ class casync {
             }
 
             // Use the built-in shell diff command to compare the outputs of mtree commands on both sources.
-            // diff returns a 1 if it found differences, which causes exec to throw an exception. The output is 
+            // diff returns a 1 if it found differences, which causes execP to throw an exception. The output is 
             // therefore handled in the catch routine.
             let cmd = `diff <(echo "${mtree1}") <(echo "${mtree2}")`
-            exec(cmd, { shell: '/bin/bash' }).then((stdout, stderr) => {
+            execP(cmd, { shell: '/bin/bash' }).then((stdout, stderr) => {
                 if (stderr) {
                     reject(stderr.trim);
                 }
@@ -226,7 +227,7 @@ class casync {
      * @param {*} url 
      * @returns - Returns a promise with the text data when complete
      */
-    static wget(url) {
+    static  wget(url) {
         return new Promise((resolve, reject) => {
             try {
                 let cmd = `wget -q --retry-connrefused --tries=10 --no-http-keep-alive -O '-'
@@ -236,11 +237,15 @@ class casync {
                 --header 'User-Agent: Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36'
                 '${url}'`.replace(/\n/g, ' ');  // replace newline characters with space
 
-                exec(cmd, { maxBuffer: 1024000000 }).then(data => {     // Increased maxbuffer to allow large files to be downloaded (default is 200kb(?)).
-                    if (data.stderr) {
+                // Increased maxbuffer to allow large files to be downloaded (default is 200kb(?)).
+                exec(cmd, { maxBuffer: 1024000000 }, (error, stdout, stderr) => {
+                    if (error) {
+                        reject(error.message);
+                    }
+                    else if (stderr) {
                         reject(data.stderr);
                     }
-                    else if (data.stdout) {
+                    else if (stdout) {
                         resolve(data.stdout);
                     }
                     else {
@@ -248,8 +253,9 @@ class casync {
                     }
                 });
             }
-            catch (error) {
-                reject(error.message);
+            catch (err) {
+                reject(err.message);
+                //reject(error.message);
             }
         });
     }
