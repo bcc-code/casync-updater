@@ -235,7 +235,7 @@ function extract(srcIndex, srcOptions, dstPath, dstOptions) {
         // Check for valid destination
         if (dirExists(dstPath)) {
             casync.extract(srcIndex, dstPath, srcOptions).then(() => {
-                casync.digest(dstPath).then(checksum => {
+                casync.digest(dstPath, dstOptions).then(checksum => {
                     resolve(checksum)
                 }).catch(err => {
                     reject(err);

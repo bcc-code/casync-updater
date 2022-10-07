@@ -4,8 +4,9 @@
 
 const util = require('util');
 const execP = util.promisify(require('child_process').exec);
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 
 /**
  * Nodejs wrapper for casync (see https://github.com/systemd/casync) with added functionality
@@ -123,7 +124,7 @@ class casync {
     static mtree(target, options) {
         return new Promise((resolve, reject) => {
             let cmd = `casync mtree ${this._optionString(options)} ${target}`;
-            execP(cmd, { shell: '/bin/bash' , maxBuffer: 1024000000}).then(data => {
+            execP(cmd, { shell: '/bin/bash', maxBuffer: 1024000000 }).then(data => {
                 if (data.stderr && data.stderr != '') {
                     reject(data.stderr.toString());
                 }
@@ -149,39 +150,63 @@ class casync {
      */
     static diff(source1, options1, source2, options2) {
         return new Promise(async (resolve, reject) => {
-            // Get mtree file(s)
-            let mtree1;
-            await this.readFile(source1 + ".mtree").then(data => { mtree1 = data }).catch(err => {});
-            let mtree2;
-            await this.readFile(source2 + ".mtree").then(data => { mtree2 = data }).catch(err => {});
+            try {
+                // Get mtree file(s)
+                let mtree1;
+                await this.readFile(source1 + ".mtree").then(data => { mtree1 = data }).catch(err => { });
+                let mtree2;
+                await this.readFile(source2 + ".mtree").then(data => { mtree2 = data }).catch(err => { });
 
-            // Check if mtree file output is valid, and run mtree if not valid
-            if (!mtree1) {
-                await this.mtree(source1, options1).then(data => { mtree1 = data }).catch(err => { reject(err) });
-            }
-            if (!mtree2) {
-                await this.mtree(source2, options2).then(data => { mtree2 = data }).catch(err => { reject(err) });
-            }
+                // Check if mtree file output is valid, and run mtree if not valid
+                if (!mtree1) {
+                    await this.mtree(source1, options1).then(data => { mtree1 = data }).catch(err => { reject(err) });
+                }
+                if (!mtree2) {
+                    await this.mtree(source2, options2).then(data => { mtree2 = data }).catch(err => { reject(err) });
+                }
 
-            // Use the built-in shell diff command to compare the outputs of mtree commands on both sources.
-            // diff returns a 1 if it found differences, which causes execP to throw an exception. The output is 
-            // therefore handled in the catch routine.
-            let cmd = `diff <(echo "${mtree1}") <(echo "${mtree2}")`
-            execP(cmd, { shell: '/bin/bash' }).then((stdout, stderr) => {
-                if (stderr) {
-                    reject(stderr.trim);
+                // Generate unique tmp directory name
+                let tmpDir = '/tmp/casync-updater-' + crypto.randomBytes(20).toString('hex');
+                let tmpSize = Math.round((mtree1.length + mtree2.length) * 4 / 1024 + 1) * 1024;
+
+                // Create tmpfs
+                execSync(`
+                # make tmp dir
+                mkdir -p ${tmpDir}
+
+                # mount tmpfs
+                mount -t tmpfs -o size=${tmpSize} tmpfs ${tmpDir}
+                `, { shell: "/bin/bash" });
+
+                // Write mtree files to tmp dir
+                fs.writeFileSync(tmpDir + '/mtree1', mtree1);
+                fs.writeFileSync(tmpDir + '/mtree2', mtree2);
+
+                // Use the built-in shell diff command to compare the outputs of mtree commands on both sources.
+                // diff exits with exit code 1 when difference is detected, causing exec(Sync) to throw an error.
+                // As this is normal operation, the error is catched.
+                try {
+                    execSync(`
+                    diff ${tmpDir}/mtree1 ${tmpDir}/mtree2 > ${tmpDir}/diff
+                    `, { shell: "/bin/bash" });
                 }
-                else {
-                    resolve([]);
-                }
-            }).catch(output => {
-                if (output.stderr) {
-                    reject(output.stderr.trim());
-                }
-                else if (output.stdout) {
-                    // Parse the diff output
+                catch { }
+
+
+                // Read diff output
+                let diff = fs.readFileSync(tmpDir + '/diff').toString();
+
+                // Cleanup
+                execSync(`
+                umount ${tmpDir}
+                rm -rf ${tmpDir}
+                `, { shell: "/bin/bash" });
+
+
+                // Parse the diff output
+                if (diff) {
                     let result = [];
-                    output.stdout.split('\n').filter(line => line.startsWith('>')).forEach(line => {
+                    diff.split('\n').filter(line => line.startsWith('>')).forEach(line => {
                         let arr = line.split(' ');
                         result.push(arr[1]);
                     });
@@ -190,7 +215,10 @@ class casync {
                 else {
                     resolve([]);
                 }
-            });
+            }
+            catch (err) {
+                reject(err.message);
+            }
         });
     }
 
@@ -227,7 +255,7 @@ class casync {
      * @param {*} url 
      * @returns - Returns a promise with the text data when complete
      */
-    static  wget(url) {
+    static wget(url) {
         return new Promise((resolve, reject) => {
             try {
                 let cmd = `wget -q --retry-connrefused --tries=10 --no-http-keep-alive -O '-'
@@ -243,10 +271,10 @@ class casync {
                         reject(error.message);
                     }
                     else if (stderr) {
-                        reject(data.stderr);
+                        reject(stderr);
                     }
                     else if (stdout) {
-                        resolve(data.stdout);
+                        resolve(stdout);
                     }
                     else {
                         resolve();
@@ -255,7 +283,6 @@ class casync {
             }
             catch (err) {
                 reject(err.message);
-                //reject(error.message);
             }
         });
     }
