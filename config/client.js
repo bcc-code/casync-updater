@@ -235,7 +235,7 @@ function extract(srcIndex, srcOptions, dstPath, dstOptions) {
         // Check for valid destination
         if (dirExists(dstPath)) {
             casync.extract(srcIndex, dstPath, srcOptions).then(() => {
-                casync.digest(dstPath).then(checksum => {
+                casync.digest(dstPath, dstOptions).then(checksum => {
                     resolve(checksum)
                 }).catch(err => {
                     reject(err);
@@ -296,7 +296,7 @@ function extractBackup(backupIndex, backupOptions, dstPath, dstOptions) {
         // Check for valid data and valid destination
         if (dirExists(dstPath) && fs.existsSync(backupIndex)) {
             casync.extract(backupIndex, dstPath, backupOptions).then(() => {
-                casync.digest(dstPath).then(checksum => {
+                casync.digest(dstPath, dstOptions).then(checksum => {
                     resolve(checksum)
                 }).catch(err => {
                     reject(err);
