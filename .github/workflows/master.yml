@@ -18,8 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: install dependencies
-        run: sudo apt-get -y update; sudo apt-get -y install casync nodejs;
+        run: apt-get -y update; apt-get -y install casync nodejs;
       - name: create output directory - master
-        run: sudo mkdir -p /var/www/casync-updater/master; sudo chmod -R 755 /var/www/casync-updater;
+        run: mkdir -p /var/www/casync-updater/master; chmod -R 755 /var/www/casync-updater;
       - name: casync make - master
-        run: sudo node config/server.js .github/workflows/master.json
+        run: node config/server.js .github/workflows/master.json
