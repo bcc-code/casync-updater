@@ -132,5 +132,5 @@ casync mtree output is also handled in a similar way (used to detect changes for
 
 ## To do
 - [ ] Secure backup store - prevent unintentional / malicious tampering with offline updates. (Ideas welcome)
-- [ ] Distribute casync-updater updates via CDN (and not directly from GitHub pages due to usage limits).
 - [ ] Prevent client.js from terminating while busy executing a cycle.
+- [ ] Add online check - check for updates on online detection (ping check to update server?)
