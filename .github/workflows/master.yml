@@ -1,0 +1,21 @@
+name: master
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'config/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: casync make - master
+        run: node config/server.js .github/workflows/master.json
