@@ -44,7 +44,7 @@ echo ''
 echo 'Installing casync-updater script files'
 echo ''
 echo -e "${NC}"
-casync extract --with=2sec-time --store=https://developer.bcc.no/casync-updater/master/store.castr https://developer.bcc.no/casync-updater/master/index.caidx /opt/casync-updater/
+casync extract --with=2sec-time --store=https://update.casync-updater.net/master/store.castr https://update.casync-updater.net/master/index.caidx /opt/casync-updater/
 
 # Create service configuration file
 echo -e "${BLUE}"
