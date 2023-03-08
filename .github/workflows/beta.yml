@@ -1,0 +1,25 @@
+name: beta
+
+on:
+  push:
+    branches:
+      - beta
+    paths:
+      - 'config/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+      - uses: actions/checkout@v3
+      - name: install dependencies
+        run: sudo apt-get -y update; sudo apt-get -y install casync nodejs;
+      - name: create output directory - beta
+        run: sudo mkdir -p /var/www/casync-updater/beta; sudo chmod -R 755 /var/www/casync-updater;
+      - name: casync make - beta
+        run: sudo node config/server.js .github/workflows/beta.json
