@@ -46,8 +46,8 @@ async function processEntry(config) {
         ];
 
         // Create or update the archive
-        casync.make(config.index, config.source, options).then(checksum => {
-            console.log(`Created archive - checksum: ${checksum}`);
+        casync.make(config.index, config.source, options).then(digestData => {
+            console.log(`Created archive - checksum: ${digestData.checksum}; timestamp: ${digestData.timestamp}`);
         }).catch(err => {
             console.error(`Unable to create archive: ${err}`);
             process.exit(1);

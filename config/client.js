@@ -9,11 +9,6 @@ const { casync } = require('./casync.js');
 const { exec, execSync } = require('child_process');
 
 /**
- * Checksum cache
- */
-var checksum = {};
-
-/**
  * Trigger actions cache
  */
 var tActions = {};
@@ -76,14 +71,6 @@ function parseConfig(config) {
                     { with: '2sec-time' },
                 ];
 
-                // Get destination checksum
-                await casync.digest(c.dstPath, dstOptions).then(data => {
-                    checksum[c.dstPath] = data;
-                    // console.log(`Found checksum for destination ${c.dstPath}`);
-                }).catch(err => {
-                    console.error(`Unable to find checksum for destination ${c.dstPath}: ${err}`)
-                });
-
                 // First run
                 await runCycle(c.srcIndex, srcOptions, c.backupIndex, backupOptions, c.dstPath, dstOptions, c.triggers);
 
@@ -116,11 +103,14 @@ function parseConfig(config) {
  * @param {*} triggers
  */
 async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPath, dstOptions, triggers) {
+    // Destination checksum cache path
+    let dstDirName = dstPath.match(/\/[^/]*$/g).replace(/\//g,'');
+    let dstCksPath = path.join(dstPath + '/../' + dstDirName + '.cks');
+
     // Get the source checksum
-    let sourceChecksum;
+    let srcChecksum;
     await casync.digest(srcIndex, srcOptions).then(data => {
-        sourceChecksum = data.trim();
-        // console.log(`Found checksum for source ${srcIndex}`);
+        srcChecksum = data;
     }).catch(err => {
         console.log(`Source index not available: ${srcIndex}`);
     });
@@ -129,15 +119,22 @@ async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPat
     let backupChecksum;
     if (backupIndex && backupOptions) {
         await casync.digest(backupIndex, backupOptions).then(data => {
-            backupChecksum = data.trim();
-            // console.log(`Found checksum for backup: ${backupIndex}`);
+            backupChecksum = data;
         }).catch(err => {
             console.log(`Backup index not available: ${backupIndex}`);
         });
     }
 
-    // Check if source checksum changed (or first run)
-    if (sourceChecksum && sourceChecksum !== checksum[dstPath]) {
+    // Get the destination directory checksum
+    let dstChecksum;
+    await casync.digest(dstPath, dstOptions, dstCksPath).then(data => {
+        dstChecksum = data;
+    }).catch(err => {
+        console.log(`Destination not available: ${dstPath}`);
+    });
+
+    // Check if source checksum changed
+    if (srcChecksum && dstChecksum && srcChecksum.checksum !== dstChecksum.checksum && srcChecksum.timestamp > dstChecksum.timestamp || !dstChecksum.timestamp) {
         // Get changed files / directories (used for triggers)
         let diff;
         await casync.diff(srcIndex, srcOptions, dstPath, dstOptions).then(data => {
@@ -147,9 +144,8 @@ async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPat
         });
 
         // Exctract source and update cached checksum
-        await extract(srcIndex, srcOptions, dstPath, dstOptions).then(data => {
+        await casync.extract(srcIndex, srcOptions, dstPath, dstCksPath).then(data => {
             if (data) {
-                checksum[dstPath] = data;
                 console.log(`Extracted source from ${srcIndex} to ${dstPath}`);
             }
             else {
@@ -157,18 +153,15 @@ async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPat
             }
         }).catch(err => {
             console.error(`Failed to extract source from ${srcIndex} to ${dstPath}: ${err}`);
-            delete checksum[dstPath];
         });
 
         // Execute triggers
         execTriggers(diff, triggers);
     }
     // If the source is not available, try to extract from backup source
-    else if (!sourceChecksum && backupChecksum && checksum[dstPath] &&
-        checksum[dstPath] !== backupChecksum) {
-        await extractBackup(backupIndex, backupOptions, dstPath, dstOptions).then(data => {
+    else if (!srcChecksum && backupIndex && srcChecksum && backupChecksum && backupChecksum.checksum !== srcChecksum.checksum && backupChecksum.timestamp > srcChecksum.timestamp || !srcChecksum.timestamp) {
+        await casync.extract(backupIndex, backupOptions, dstPath, dstCksPath).then(data => {
             if (data) {
-                checksum[dstPath] = data
                 console.log(`Extracted backup from ${backupIndex} to ${dstPath}`);
             }
             else {
@@ -176,137 +169,18 @@ async function runCycle(srcIndex, srcOptions, backupIndex, backupOptions, dstPat
             };
         }).catch(err => {
             console.error(`Failed to extract backup from ${backupIndex} to ${dstPath}: ${err}`);
-            delete checksum[dstPath];
         });
     }
 
-    // check if backup checksum is outdated (or first run)
-    if (backupIndex && checksum[dstPath] && backupChecksum !== checksum[dstPath]) {
+    // check if backup checksum is outdated
+    if (backupIndex && dstChecksum && backupChecksum && backupChecksum.checksum !== dstChecksum.checksum && dstChecksum.timestamp > backupChecksum.timestamp || !backupChecksum.timestamp) {
         // Make backup archive
-        await makeBackup(dstPath, backupIndex, backupOptions).then(data => {
+        await casync.make(backupIndex, dstPath, backupOptions, dstCksPath).then(data => {
             console.log(`Saved backup from ${dstPath} to ${backupIndex}`);
         }).catch(err => {
             console.log(`Unable to save backup from ${dstPath} to ${backupIndex}: ${err}`);
         });
     }
-}
-
-/**
- * Check if a directory exists
- * @param {string} path 
- * @returns - true if the directory exists
- */
-function dirExists(path) {
-    let p = path;
-    if (!p.endsWith('/')) { p += '/' }
-
-    return fs.existsSync(p);
-}
-
-/**
- * Determine whether the given `path` points to an empty directory.
- * @param {string} path 
- * @returns {Boolean}
- */
-function isEmptyDir(path) {
-    try {
-        let files = fs.readdirSync(path);
-        if (files.length > 0) {
-            return false;
-        }
-        else {
-            return true;
-        }
-    } catch (error) {
-        return true;
-    }
-}
-
-/**
- * Extract from a casync source to a local directory
- * @param {string} srcIndex 
- * @param {Object} srcOptions
- * @param {path} dstPath 
- * @param {object} options 
- * @returns Promise with the checksum if the operation was successful
- */
-function extract(srcIndex, srcOptions, dstPath, dstOptions) {
-    return new Promise((resolve, reject) => {
-        // Check for valid destination
-        if (dirExists(dstPath)) {
-            casync.extract(srcIndex, dstPath, srcOptions).then(() => {
-                casync.digest(dstPath, dstOptions).then(checksum => {
-                    resolve(checksum)
-                }).catch(err => {
-                    reject(err);
-                });
-            }).catch(err => {
-                reject(err);
-            });
-        }
-        else {
-            reject(`Destination directory ${dstPath} does not exist.`);
-        }
-    });
-}
-
-/**
- * Makes a backup of a local directory to a local casync destination
- * @param {String} srcPath - Source directory path
- * @param {String} dstIndex - Destination index file path
- * @param {Object} dstOptions - Destination options
- * @returns Promise with the checksum if the operation was successful
- */
-function makeBackup(srcPath, dstIndex, dstOptions) {
-    return new Promise((resolve, reject) => {
-        let dstDir = path.dirname(dstIndex);
-        let srcExist = dirExists(srcPath);
-        let srcEmpty = false;
-        if (srcExist) { srcEmpty = isEmptyDir(srcPath) }
-        let dstExist = dirExists(dstDir);
-
-        // Check for valid index and source
-        if (srcExist && !srcEmpty && dstExist) {
-            casync.make(dstIndex, srcPath, dstOptions).then(checksum => {
-                resolve(checksum);
-            }).catch(err => {
-                reject(err);
-            });
-        }
-        else {
-            let msg = '';
-            if (!srcExist) { msg += `Source directory ${srcPath} does not exist; ` }
-            else if (srcEmpty) { msg += `Source directory ${srcPath} is empty; ` }
-            if (!dstExist) { msg += `Destination directory ${dstDir} does not exist; ` }
-            reject(msg);
-        }
-    });
-}
-
-/**
- * Extract a backup from a local casync source to a local directory
- * @param {String} backupIndex 
- * @param {Object} backupOptions 
- * @param {String} dstPath 
- * @param {Object} dstOptions
- * @returns Promise with the checksum if the operation was successful
- */
-function extractBackup(backupIndex, backupOptions, dstPath, dstOptions) {
-    return new Promise((resolve, reject) => {
-        // Check for valid data and valid destination
-        if (dirExists(dstPath) && fs.existsSync(backupIndex)) {
-            casync.extract(backupIndex, dstPath, backupOptions).then(() => {
-                casync.digest(dstPath, dstOptions).then(checksum => {
-                    resolve(checksum)
-                }).catch(err => {
-                    reject(err);
-                });
-            });
-        }
-        else {
-            reject(`Directory ${dstPath} or ${backupIndex} does not exist.`);
-        }
-    });
 }
 
 /**

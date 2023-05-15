@@ -1,0 +1,22 @@
+{
+  "name": "casync-updater",
+  "version": "1.0.0",
+  "description": "casync based OTA updater for software running on linux",
+  "main": "config/server.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bcc-code/casync-updater.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bcc-code/casync-updater/issues"
+  },
+  "homepage": "https://github.com/bcc-code/casync-updater#readme"
+}

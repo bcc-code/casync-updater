@@ -7,37 +7,63 @@ const execP = util.promisify(require('child_process').exec);
 const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const crypto = require('crypto');
+const path = require('path');
 
 /**
  * Nodejs wrapper for casync (see https://github.com/systemd/casync) with added functionality
  */
 class casync {
     /**
-     * Creates a casync archive (For more information, see man casync.) and writes the checksum to the index path.
+     * Creates a casync archive (For more information, see man casync.) and writes the checksum & timestamp to the index path.
      * @param {String} index - Index file name
      * @param {String} source - Path to directory or device
      * @param {Object} options - casync options in the following format: [ {option1: value}, {option2, value}, ... , {optionN: value} ] }. For more information, see man casync.
-     * @returns - Promise with checksum when archive is created
+     * @param {Object} override_cks - Optional path to an override checksum file to be used as the output archive's .cks checksum file.
+     * @returns - Promise with checksum and timestamp when archive is created
      */
-    static make(index, source, options) {
+    static make(index, source, options, override_cks) {
         return new Promise((resolve, reject) => {
+            // validate data
+            let dirName = path.dirname(index);
+            if (!this.dirExists(dirName)) reject(`Unable to make archive: Destination directory does not exist for ${index}`);
+            if (!this.dirExists(source)) reject(`Unable to make archive: Source directory ${source} does not exist`);
+            if (this.dirEmpty(source)) reject(`Unable to make archive: Source directory ${source} is empty`);
+
             execP(`casync make ${this._optionString(options)} ${index} ${source}`).then(data => {
                 if (data.stderr && data.stderr != '') {
                     reject(data.stderr.toString());
                 }
                 else {
-                    let checksum = data.stdout.trim();
+                    let checksum_data;
+                    if (override_cks) {
+                        // Load checksum file from disk
+                        try {
+                            checksum_data = JSON.parse(fs.readFileSync(override_cks));
+                            // validate checksum file
+                            if (!checksum_data.checksum || !checksum_data.timestamp) {
+                                reject(`Invalid source checksum file for ${source}`);
+                            }
+                        } catch (err) {
+                            reject(`Invalid source checksum file for ${source}: ${err.message}`);
+                        }
+                    } else {
+                        // Calculate checksum if not overridden
+                        checksum_data = {
+                            checksum: data.stdout.trim(),
+                            timestamp: Date.now()
+                        };
+                    }
 
-                    // Write checksum to disk
-                    this.writeFile(index + ".cks", checksum);
+                    // Write checksum & timestamp to disk
+                    this.writeFile(index + ".cks", JSON.stringify(checksum_data));
 
                     // Calculate mtree
                     this.mtree(index, options).then(data => {
                         if (data) {
                             this.writeFile(index + ".mtree", data);
                         }
-                        // Return checksum with promise
-                        resolve(checksum);
+                        // Return checksum & timestamp with promise
+                        resolve(checksum_data);
                     }).catch(err => {
                         reject(err.message);
                     });
@@ -51,25 +77,44 @@ class casync {
     /**
      * Extracts a casync archive. For more information, see man casync.
      * @param {string} index - Index file name
-     * @param {string} destination - Path to directory or device
+     * @param {string} destination - Path to directory (single files currently not supported)
      * @param {Object} options - casync options in the following format: [ {option1: value}, {option2, value}, ... , {optionN: value} ] }. For more information, see man casync.
+     * @param {string} checksum_file - optional file path where the source (as per index) checksum file should be copied to.
      * @returns - Promise when archive is extracted
      */
-    static extract(index, destination, options) {
+    static extract(index, destination, options, checksum_file) {
         return new Promise((resolve, reject) => {
-            execP(`casync extract ${this._optionString(options)} ${index} ${destination}`).then(data => {
-                if (data.stderr && data.stderr != '') {
-                    reject(data.stderr.toString());
-                }
-                else if (data.stdout) {
-                    resolve(data.stdout.toString());
-                }
-                else {
-                    resolve();
-                }
-            }).catch(err => {
-                reject(err.message);
-            });
+            if (this.dirExists(destination)) {
+                // Extract archive
+                execP(`casync extract ${this._optionString(options)} ${index} ${destination}`).then(data => {
+                    if (data.stderr && data.stderr != '') {
+                        reject(data.stderr.toString());
+                    }
+                    else if (data.stdout) {
+                        return data.stdout.toString();
+                    }
+                    else {
+                        return;
+                    }
+                }).then(data => {
+                    // Read checksum
+                    if (checksum_file) {
+                        this.readFile(checksum_file).then(cks_data => {
+                            // Write checksum to disk
+                            try {
+                                this.writeFile(checksum_file, cks_data);
+                                resolve(JSON.parse(cks_data));
+                            } catch (err) {
+                                reject(err);
+                            }
+                        }).catch(err => reject(err));
+                    }
+                }).catch(err => {
+                    reject(err.message);
+                });
+            } else {
+                reject(`Destination directory ${destination} does not exist`)
+            }
         });
     }
 
@@ -77,19 +122,30 @@ class casync {
      * Checks if there is an existing checksum file for the target, and returns the checksum. If not, calculates the checksum of the target casync archive, directory or device. For more information, see man casync.
      * @param {String} target 
      * @param {Object} options - casync options in the following format: [ {option1: value}, {option2, value}, ... , {optionN: value} ] }. For more information, see man casync.
-     * @returns - Promise containing the checksum
+     * @param {string} checksum_file - Optional path to checksum file. This can be used to specify the location of a checksum file when digesting a directory. If the file is specified, the checksum will be read from the file and not calculated from the directory contents.
+     * @returns - Promise containing the checksum and timestamp
      */
-    static digest(target, options) {
+    static digest(target, options, checksum_file) {
+        if (!checksum_file) {
+            checksum_file = target + ".cks";
+        }
         return new Promise((resolve, reject) => {
-            // Check if there is a checksum file
-            this.readFile(target + ".cks").then(checksum => {
-                if (checksum) {
-                    resolve(checksum);
+            // Check if there is a checksum & timestamp file
+            this.readFile(checksum_file).then(data => {
+                let o;
+                if (data) {
+                    try {
+                        o = JSON.parse(data)
+                        resolve(o);
+                    } catch (err) {
+                        console.log(`Digest: Unable to parse checksum data for ${target}: ${err.message}`);
+                    }
                 }
-                else {
+                if (!o) {
                     // Digest target
+                    console.log(`Digest: calculating checksum from file structure / archive for ${target}`);
                     execP(`casync digest ${this._optionString(options)} ${target}`).then(data => {
-                        resolve(data.stdout.trim());
+                        resolve({ checksum: data.stdout.trim() });
                     }).catch(err => {
                         reject(err.message);
                     });
@@ -294,6 +350,37 @@ class casync {
      */
     static writeFile(path, data) {
         fs.writeFileSync(path, data);
+    }
+
+    /**
+     * Check if a directory exists
+     * @param {string} path 
+     * @returns - true if the directory exists
+     */
+    static dirExists(path) {
+        let p = path;
+        if (!p.endsWith('/')) { p += '/' }
+
+        return fs.existsSync(p);
+    }
+
+    /**
+     * Determine whether the given `path` points to an empty directory.
+     * @param {string} path 
+     * @returns {Boolean}
+     */
+    static dirEmpty(path) {
+        try {
+            let files = fs.readdirSync(path);
+            if (files.length > 0) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        } catch (error) {
+            return true;
+        }
     }
 }
 
